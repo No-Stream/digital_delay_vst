@@ -8,7 +8,8 @@ const int kNumPrograms = 5;
 
 enum EParams
 {
-  kThreshold = 0,
+  ktime = 0,
+  kFeedback=1,
   kNumParams
 };
 
@@ -17,13 +18,17 @@ enum ELayout
   kWidth = GUI_WIDTH,
   kHeight = GUI_HEIGHT,
 
-  kThresholdX = 79,
-  kThresholdY = 62,
-  kKnobFrames = 128
+  ktimeX = 79,
+  ktimeY = 62,
+  kKnobFrames = 128,
+
+  kFeedbackX = 279,
+  kFeedbackY = 62,
+  kKnobFramesFB = 128
 };
 
 void DelayIdeaz::CreatePresets() {
-	MakePreset("clean", 100.0);
+	MakePreset("100ms", 100.0);
 	MakePreset("slightly distorted", 80.0);
 	MakePreset("woooo", 40.0);
 	MakePreset("waaaa", 20.0);
@@ -31,22 +36,26 @@ void DelayIdeaz::CreatePresets() {
 }
 
 DelayIdeaz::DelayIdeaz(IPlugInstanceInfo instanceInfo)
-  :	IPLUG_CTOR(kNumParams, kNumPrograms, instanceInfo), mThreshold(1.)
+  :	IPLUG_CTOR(kNumParams, kNumPrograms, instanceInfo), mtime(1.), mFeedback(1.)
 {
   TRACE;
 
   //arguments are: name, defaultVal, minVal, maxVal, step, label
-  GetParam(kThreshold)->InitDouble("Delay Time", 1, 1, 2000.0, 50, "msec");
-  GetParam(kThreshold)->SetShape(2.);
+  GetParam(ktime)->InitDouble("Delay Time", 1, 1, 2000.0, 45, "msec");
+  GetParam(ktime)->SetShape(2.);
 
+  GetParam(kFeedback)->InitDouble("Feedback", 50, 1, 99.0, 1, "%");
+  GetParam(kFeedback)->SetShape(2.);
 
   IGraphics* pGraphics = MakeGraphics(this, kWidth, kHeight);
   //pGraphics->AttachPanelBackground(&COLOR_GRAY); //old one-color background
   pGraphics->AttachBackground(BACKGROUND_ID, BACKGROUND_FN);
 
   IBitmap knob = pGraphics->LoadIBitmap(KNOB_ID, KNOB_FN, kKnobFrames);
+  IBitmap knobFB = pGraphics->LoadIBitmap(KNOB_ID, KNOB_FN, kKnobFramesFB);
 
-  pGraphics->AttachControl(new IKnobMultiControl(this, kThresholdX, kThresholdY, kThreshold, &knob));
+  pGraphics->AttachControl(new IKnobMultiControl(this, ktimeX, ktimeY, ktime, &knob));
+  pGraphics->AttachControl(new IKnobMultiControl(this, kFeedbackX, kFeedbackY, kFeedback, &knob));
 
   AttachGraphics(pGraphics);
 
@@ -60,8 +69,6 @@ DelayIdeaz::DelayIdeaz(IPlugInstanceInfo instanceInfo)
 }
 
 DelayIdeaz::~DelayIdeaz() {}
-
-//to-do - add feedback and delay time knobs
 
 void DelayIdeaz::ProcessDoubleReplacing(double** inputs, double** outputs, int nFrames)
 {
@@ -77,8 +84,8 @@ void DelayIdeaz::ProcessDoubleReplacing(double** inputs, double** outputs, int n
 	for (int s = 0; s < nFrames; ++s, ++input, ++output) {
 		*output = (*input + AudioArray.front());
 		AudioArray.pop_front();
-		//feedback = 
-		AudioArray.push_back(*output / 2);
+		AudioArray.push_back(*output / mFeedback);
+		//.5 sub'd for mFeedback
 	}
   }
 }
@@ -95,15 +102,22 @@ void DelayIdeaz::OnParamChange(int paramIdx)
 
   switch (paramIdx)
   {
-    case kThreshold:
-      mThreshold = GetParam(kThreshold)->Value();
-	  
+    case ktime:
+      mtime = GetParam(ktime)->Value();
 	  AudioArray.clear();
-
-	  for (int i = 0; i < ((int)(44.1*mThreshold)); i++) {
+	  for (int i = 0; i < ((int)(44.1*mtime)); i++) {
 		  AudioArray.push_back(0);
 	  }
       break;
+
+	case kFeedback:
+		mFeedback = (100 / ((int)(GetParam(kFeedback)->Value())));
+		AudioArray.clear();
+
+		for (int i = 0; i < ((int)(44.1*mtime)); i++) {
+			AudioArray.push_back(0);
+		}
+		break;
 
     default:
       break;

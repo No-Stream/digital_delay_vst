@@ -16,6 +16,8 @@ public:
 
 private:
   double mThreshold;
+  double mFeedback;
+  double mtime;
   void CreatePresets();
   std::list<double*> DelayArray;
   std::list<double> AudioArray;
